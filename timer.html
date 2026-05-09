@@ -1,1 +1,180 @@
-https://yoursite.com/timer.html?timein={Time In}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Job Timer</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #0f0f0f;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    .card {
+      background: #1a1a1a;
+      border: 1px solid #2a2a2a;
+      border-radius: 16px;
+      padding: 28px 32px;
+      width: 100%;
+      max-width: 360px;
+      text-align: center;
+    }
+
+    .label {
+      font-size: 11px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: #666;
+      margin-bottom: 12px;
+    }
+
+    .timer {
+      font-size: 52px;
+      font-weight: 600;
+      letter-spacing: -1px;
+      color: #fff;
+      font-variant-numeric: tabular-nums;
+      margin-bottom: 8px;
+    }
+
+    .timer.warning { color: #f59e0b; }
+    .timer.long    { color: #ef4444; }
+
+    .breakdown {
+      font-size: 13px;
+      color: #555;
+      min-height: 20px;
+      margin-bottom: 20px;
+    }
+
+    .divider {
+      border: none;
+      border-top: 1px solid #2a2a2a;
+      margin: 20px 0;
+    }
+
+    .meta {
+      font-size: 12px;
+      color: #444;
+    }
+
+    .meta span {
+      color: #666;
+    }
+
+    .dot {
+      display: inline-block;
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #22c55e;
+      margin-right: 6px;
+      animation: pulse 1.5s ease-in-out infinite;
+      vertical-align: middle;
+      position: relative;
+      top: -1px;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0.3; }
+    }
+
+    .error {
+      font-size: 14px;
+      color: #ef4444;
+      margin-top: 8px;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="label"><span class="dot"></span>Live — job in progress</div>
+    <div class="timer" id="timer">--:--:--</div>
+    <div class="breakdown" id="breakdown"></div>
+    <hr class="divider" />
+    <div class="meta">Started at <span id="startLabel">--</span></div>
+    <div class="error" id="error"></div>
+  </div>
+
+  <script>
+    let intervalId = null;
+
+    function pad(n) {
+      return String(Math.floor(n)).padStart(2, '0');
+    }
+
+    function formatTime(date) {
+      let h = date.getHours();
+      const m = String(date.getMinutes()).padStart(2, '0');
+      const ampm = h >= 12 ? 'PM' : 'AM';
+      h = h % 12 || 12;
+      return h + ':' + m + ' ' + ampm;
+    }
+
+    function tick(startTime) {
+      const now  = new Date();
+      const diff = now - startTime;
+
+      if (diff < 0) {
+        document.getElementById('timer').textContent = 'Not started';
+        document.getElementById('breakdown').textContent = 'Start time is in the future';
+        return;
+      }
+
+      const totalSec = Math.floor(diff / 1000);
+      const hrs  = Math.floor(totalSec / 3600);
+      const mins = Math.floor((totalSec % 3600) / 60);
+      const secs = totalSec % 60;
+
+      const timerEl = document.getElementById('timer');
+      timerEl.textContent = pad(hrs) + ':' + pad(mins) + ':' + pad(secs);
+
+      // Color shift after 1h (warning) and 2h (long)
+      timerEl.classList.remove('warning', 'long');
+      if (hrs >= 2)      timerEl.classList.add('long');
+      else if (hrs >= 1) timerEl.classList.add('warning');
+
+      const parts = [];
+      if (hrs  > 0) parts.push(hrs  + (hrs  === 1 ? ' hr'  : ' hrs'));
+      if (mins > 0) parts.push(mins + (mins === 1 ? ' min' : ' mins'));
+      if (secs > 0 || parts.length === 0) parts.push(secs + ' sec');
+      document.getElementById('breakdown').textContent = parts.join(' · ');
+    }
+
+    function init() {
+      const params  = new URLSearchParams(window.location.search);
+      const timeIn  = params.get('timein');
+      const errorEl = document.getElementById('error');
+
+      if (!timeIn) {
+        errorEl.textContent = 'No timein parameter found in URL.';
+        document.getElementById('timer').textContent = '--:--:--';
+        return;
+      }
+
+      const startTime = new Date(decodeURIComponent(timeIn));
+
+      if (isNaN(startTime.getTime())) {
+        errorEl.textContent = 'Could not parse the timein value: "' + timeIn + '"';
+        return;
+      }
+
+      document.getElementById('startLabel').textContent = formatTime(startTime);
+
+      tick(startTime);
+      intervalId = setInterval(() => tick(startTime), 1000);
+    }
+
+    init();
+  </script>
+</body>
+</html>
