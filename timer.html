@@ -66,7 +66,8 @@
       0%, 100% { opacity: 1; }
       50%       { opacity: 0.3; }
     }
-    .error { font-size: 14px; color: #ef4444; margin-top: 8px; }
+    .error { font-size: 11px; color: #666; margin-top: 8px; }
+    .debug { font-size: 10px; color: #444; margin-top: 6px; word-break: break-all; }
   </style>
 </head>
 <body>
@@ -77,11 +78,10 @@
     <hr class="divider" />
     <div class="meta">Started at <span id="startLabel">--</span></div>
     <div class="error" id="error"></div>
+    <div class="debug" id="debug"></div>
   </div>
 
   <script>
-    let intervalId = null;
-
     function pad(n) { return String(Math.floor(n)).padStart(2, '0'); }
 
     function formatTime(date) {
@@ -93,16 +93,22 @@
     }
 
     function parseGlideDate(raw) {
-      // Strip surrounding quotes and curly braces Glide sometimes adds
-      let cleaned = raw.trim().replace(/^["'{]+|["'}]+$/g, '').trim();
+      // Step 1: aggressively strip ALL non-date characters from start and end
+      // Remove: { } " ' spaces
+      let cleaned = raw.replace(/[\{\}"'\s]/g, ' ').trim();
+      
+      // Step 2: also handle URL encoding - %7B = { and %7D = }
+      cleaned = decodeURIComponent(cleaned).replace(/[\{\}"'\s]+/g, ' ').trim();
 
-      // Try native parse first
+      document.getElementById('debug').textContent = 'Parsing: "' + cleaned + '"';
+
+      // Step 3: try native parse
       let d = new Date(cleaned);
       if (!isNaN(d)) return d;
 
-      // Handle "M/D/YYYY, H:MM:SS AM/PM" format
+      // Step 4: manual parse for M/D/YYYY, H:MM:SS AM/PM
       const match = cleaned.match(
-        /^(\d{1,2})\/(\d{1,2})\/(\d{4}),?\s+(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(AM|PM)?$/i
+        /(\d{1,2})\/(\d{1,2})\/(\d{4})[,\s]+(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(AM|PM)?/i
       );
       if (match) {
         let [, mo, day, yr, hr, min, sec, ampm] = match;
@@ -144,25 +150,26 @@
     }
 
     function init() {
-      const params  = new URLSearchParams(window.location.search);
-      const timeIn  = params.get('timein');
-      const errorEl = document.getElementById('error');
+      const params = new URLSearchParams(window.location.search);
+      const timeIn = params.get('timein');
 
       if (!timeIn) {
-        errorEl.textContent = 'No timein parameter found in URL.';
+        document.getElementById('error').textContent = 'No timein parameter found.';
         return;
       }
 
       const startTime = parseGlideDate(timeIn);
 
       if (!startTime || isNaN(startTime.getTime())) {
-        errorEl.textContent = 'Could not parse: "' + timeIn + '"';
+        document.getElementById('error').textContent = 'Could not parse date.';
+        document.getElementById('debug').textContent = 'Raw value: "' + timeIn + '"';
         return;
       }
 
       document.getElementById('startLabel').textContent = formatTime(startTime);
+      document.getElementById('debug').textContent = '';
       tick(startTime);
-      intervalId = setInterval(() => tick(startTime), 1000);
+      setInterval(() => tick(startTime), 1000);
     }
 
     init();
